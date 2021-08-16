@@ -44,7 +44,7 @@ fn it_can_get_multiple_deployments() {
             zone_id: ZONE_ID.to_owned(),
         }),
         DeployTarget::Zoneless(ZonelessTarget {
-            account_id: ACCOUNT_ID.to_owned(),
+            account_id: Some(ACCOUNT_ID.to_string()).into(),
             script_name: script_name.to_owned(),
         }),
     ];
@@ -66,7 +66,7 @@ fn it_can_get_a_top_level_zoneless_get_deployments() {
     let actual_deployments = manifest.get_deployments(environment).unwrap();
     let expected_deployments = vec![DeployTarget::Zoneless(ZonelessTarget {
         script_name: script_name.to_string(),
-        account_id: ACCOUNT_ID.to_string(),
+        account_id: Some(ACCOUNT_ID.to_string()).into(),
     })];
 
     assert_eq!(actual_deployments, expected_deployments);
@@ -85,19 +85,26 @@ fn it_errors_on_get_deployments_missing_name() {
     assert!(manifest.get_deployments(environment).is_err());
 }
 
-#[test]
-fn it_errors_on_get_deployments_missing_account_id() {
-    let script_name = "zoneless_no_account_id";
-    let workers_dev = true;
-    let mut test_toml = WranglerToml::zoneless(script_name, ACCOUNT_ID, workers_dev);
-    test_toml.account_id = None;
-    let toml_string = toml::to_string(&test_toml).unwrap();
-    let manifest = Manifest::from_str(&toml_string).unwrap();
+// #[test]
+// fn it_errors_on_get_deployments_missing_account_id() {
+//     let script_name = "zoneless_no_account_id";
+//     let workers_dev = true;
+//     let mut test_toml = WranglerToml::zoneless(script_name, ACCOUNT_ID, workers_dev);
+//     test_toml.account_id = None;
+//     let toml_string = toml::to_string(&test_toml).unwrap();
+//     let manifest = Manifest::from_str(&toml_string).unwrap();
 
-    let environment = None;
+//     // assert!(manifest.get_deployments(environment).is_err());
+//     use crate::commands::dev::edge::setup::Session;
+//     let target = manifest.get_target(None, false);
+//     for deployment in manifest.get_deployments(None)? {
+//         if Session::new(manifest.target(), GlobalUser::new(), deploy).is_err() {
+//             return;
+//         }
+//     }
 
-    assert!(manifest.get_deployments(environment).is_err());
-}
+//     panic!("at least one deployment should have required an account ID");
+// }
 
 #[test]
 fn it_errors_on_zoneless_get_deployments_workers_dev_false() {
@@ -505,7 +512,22 @@ fn it_gets_deployments_with_route_and_workers_dev_true() {
 
     let environment = None;
 
-    assert!(manifest.get_deployments(environment).is_err());
+    let deployments = manifest.get_deployments(environment).unwrap();
+    match dbg!(&*deployments) {
+        [DeployTarget::Zoned(ZonedTarget { zone_id, routes }), DeployTarget::Zoneless(ZonelessTarget {
+            account_id: _,
+            script_name: actual_script_name,
+        })] => {
+            assert!(
+                script_name == actual_script_name
+                    && zone_id == "samplezoneid"
+                    && matches!(&**routes,
+                [Route { id: None, script: Some(actual_script_name), pattern }]
+                if script_name == actual_script_name && pattern == PATTERN)
+            );
+        }
+        _ => panic!("deployments didn't match"),
+    }
 }
 
 #[test]
@@ -520,7 +542,22 @@ fn it_gets_deployments_with_routes_and_workers_dev_true() {
 
     let environment = None;
 
-    assert!(manifest.get_deployments(environment).is_err());
+    let deployments = manifest.get_deployments(environment).unwrap();
+    match dbg!(&*deployments) {
+        [DeployTarget::Zoned(ZonedTarget { zone_id, routes }), DeployTarget::Zoneless(ZonelessTarget {
+            account_id: _,
+            script_name: actual_script_name,
+        })] => {
+            assert!(
+                script_name == actual_script_name
+                    && zone_id == "samplezoneid"
+                    && matches!(&**routes,
+                [Route { id: None, script: Some(actual_script_name), pattern }]
+                if script_name == actual_script_name && pattern == PATTERN)
+            );
+        }
+        _ => panic!("deployments didn't match"),
+    }
 }
 
 // ENVIRONMENT TESTS
@@ -587,7 +624,7 @@ fn when_top_level_empty_env_workers_dev_true() {
     let actual_deployments = manifest.get_deployments(environment).unwrap();
     let expected_deployments = vec![DeployTarget::Zoneless(ZonelessTarget {
         script_name: manifest.worker_name(environment),
-        account_id: account_id.to_string(),
+        account_id: Some(account_id.to_string()).into(),
     })];
 
     assert_eq!(actual_deployments, expected_deployments);
@@ -760,7 +797,7 @@ fn when_top_level_zoneless_env_empty() {
     let actual_deployments = manifest.get_deployments(environment).unwrap();
     let expected_deployments = vec![DeployTarget::Zoneless(ZonelessTarget {
         script_name: manifest.worker_name(environment),
-        account_id: ACCOUNT_ID.to_string(),
+        account_id: Some(ACCOUNT_ID.to_string()).into(),
     })];
 
     assert_eq!(actual_deployments, expected_deployments);
@@ -797,7 +834,7 @@ fn when_top_level_zoneless_env_zoneless_workers_dev_true() {
     let environment = Some(TEST_ENV_NAME);
     let actual_deployments = manifest.get_deployments(environment).unwrap();
     let expected_deployments = vec![DeployTarget::Zoneless(ZonelessTarget {
-        account_id: ACCOUNT_ID.to_string(),
+        account_id: Some(ACCOUNT_ID.to_string()).into(),
         script_name: manifest.worker_name(environment),
     })];
 
@@ -820,7 +857,7 @@ fn when_top_level_zoneless_env_zoned_single_route_empty() {
     let environment = Some(TEST_ENV_NAME);
     let actual_deployments = manifest.get_deployments(environment).unwrap();
     let expected_deployments = vec![DeployTarget::Zoneless(ZonelessTarget {
-        account_id: ACCOUNT_ID.to_string(),
+        account_id: Some(ACCOUNT_ID.to_string()).into(),
         script_name: manifest.worker_name(environment),
     })];
 
@@ -1044,7 +1081,7 @@ fn when_top_level_zoned_env_zoneless_workers_dev_true() {
     let environment = Some(TEST_ENV_NAME);
     let actual_deployments = manifest.get_deployments(environment).unwrap();
     let expected_deployments = vec![DeployTarget::Zoneless(ZonelessTarget {
-        account_id: ACCOUNT_ID.to_string(),
+        account_id: Some(ACCOUNT_ID.to_string()).into(),
         script_name: manifest.worker_name(environment),
     })];
 
